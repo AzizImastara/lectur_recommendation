@@ -272,6 +272,7 @@ function renderUI() {
                 type="text" 
                 id="expertiseInput"
                 class="interest-input"
+                style="background-color: white; color: black;"
                 placeholder="Contoh: Cybersecurity, Machine Learning, Support Vector Machine, Dsb.."
                 value="${state.inputValue}"
               />
@@ -309,7 +310,7 @@ function renderUI() {
           ${
             state.success && state.success.includes("Publikasi")
               ? `
-            <div class="alert alert-success">
+            <div class="alert alert-success" style="background-color: #B8FFBA; color: black;">
               <strong>Sukses:</strong> ${state.success}
               <button id="closeSuccessPub" class="close-btn">×</button>
             </div>
@@ -378,6 +379,7 @@ function renderUI() {
               class="form-input" 
               required
               placeholder="Masukkan judul publikasi"
+              style="background-color: white; color: black;"
             />
           </div>
           <div class="form-group">
@@ -388,6 +390,7 @@ function renderUI() {
               class="form-input" 
               required
               placeholder="Masukkan topik publikasi"
+              style="background-color: white; color: black;"
             />
           </div>
           <div class="form-group">
@@ -400,6 +403,7 @@ function renderUI() {
               placeholder="Tahun publikasi"
               min="1900"
               max="${new Date().getFullYear()}"
+              style="background-color: white; color: black;"
             />
           </div>
           <div class="form-group">
@@ -409,6 +413,7 @@ function renderUI() {
               id="pubDomain" 
               class="form-input" 
               placeholder="Domain penelitian"
+              style="background-color: white; color: black;"
             />
           </div>
           <div class="form-group">
@@ -418,6 +423,7 @@ function renderUI() {
               id="pubAccreditation" 
               class="form-input" 
               placeholder="Tingkat akreditasi"
+              style="background-color: white; color: black;"
             />
           </div>
           <div class="modal-actions">

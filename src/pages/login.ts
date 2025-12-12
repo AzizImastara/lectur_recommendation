@@ -33,13 +33,14 @@ export function renderLogin(onLoginSuccess: () => void) {
             <div class="form-group">
               <label for="username">Username / Email</label>
               <input 
-                type="text" 
-                id="username" 
-                name="username"
-                placeholder="Masukkan username atau email"
-                required
-                autocomplete="username"
-              />
+              type="text" 
+              id="username" 
+              name="username"
+              placeholder="Masukkan username atau email"
+              required
+              autocomplete="username"
+              style="background-color: white; color: black;"
+            />
             </div>
 
             <div class="form-group">
@@ -51,12 +52,13 @@ export function renderLogin(onLoginSuccess: () => void) {
                 placeholder="Masukkan password"
                 required
                 autocomplete="current-password"
+                style="background-color: white; color: black;"
               />
             </div>
 
             <div class="form-group">
               <label for="role">Login Sebagai</label>
-              <select id="role" name="role" required>
+              <select id="role" name="role" required style="background-color: white; color: black;">
                 <option value="">Pilih role</option>
                 <option value="mahasiswa">Mahasiswa</option>
                 <option value="dosen">Dosen</option>

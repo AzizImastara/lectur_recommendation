@@ -66,6 +66,7 @@ export function renderRegister(onRegisterSuccess: () => void) {
                 placeholder="Masukkan email"
                 required
                 autocomplete="email"
+                style="background-color: white; color: black;"
               />
             </div>
 
@@ -78,6 +79,7 @@ export function renderRegister(onRegisterSuccess: () => void) {
                 placeholder="Masukkan password"
                 required
                 autocomplete="new-password"
+                style="background-color: white; color: black;"
               />
             </div>
 
@@ -90,6 +92,7 @@ export function renderRegister(onRegisterSuccess: () => void) {
                 placeholder="Masukkan ulang password"
                 required
                 autocomplete="new-password"
+                style="background-color: white; color: black;"
               />
             </div>
 
@@ -101,6 +104,7 @@ export function renderRegister(onRegisterSuccess: () => void) {
                 name="name"
                 placeholder="Masukkan nama lengkap"
                 required
+                style="background-color: white; color: black;"
               />
             </div>
 
@@ -115,6 +119,7 @@ export function renderRegister(onRegisterSuccess: () => void) {
                   name="nim"
                   placeholder="Masukkan NIM"
                   required
+                  style="background-color: white; color: black;"
                 />
               </div>
               <div class="form-group">
@@ -125,6 +130,7 @@ export function renderRegister(onRegisterSuccess: () => void) {
                   name="major"
                   placeholder="Masukkan major/jurusan"
                   required
+                  style="background-color: white; color: black;"
                 />
               </div>
               <div class="form-group">
@@ -135,6 +141,7 @@ export function renderRegister(onRegisterSuccess: () => void) {
                   name="noHp"
                   placeholder="Masukkan nomor HP"
                   required
+                  style="background-color: white; color: black;"
                 />
               </div>
             `
@@ -147,6 +154,7 @@ export function renderRegister(onRegisterSuccess: () => void) {
                   name="nidn"
                   placeholder="Masukkan NIDN"
                   required
+                  style="background-color: white; color: black;"
                 />
               </div>
               <div class="form-group">
@@ -157,6 +165,7 @@ export function renderRegister(onRegisterSuccess: () => void) {
                   name="noHp"
                   placeholder="Masukkan nomor HP"
                   required
+                  style="background-color: white; color: black;"
                 />
               </div>
               <div class="form-group">
@@ -167,6 +176,7 @@ export function renderRegister(onRegisterSuccess: () => void) {
                   name="major"
                   placeholder="Masukkan major/jurusan"
                   required
+                  style="background-color: white; color: black;"
                 />
               </div>
             `

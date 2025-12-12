@@ -92,6 +92,7 @@ function renderUI() {
                 type="text" 
                 id="interestInput"
                 class="interest-input"
+                style="background-color: white; color: black;"
                 placeholder="Contoh: Cybersecurity, Machine Learning, Support Vector Machine, Dsb..."
                 value="${state.inputValue}"
               />
