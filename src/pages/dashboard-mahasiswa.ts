@@ -28,12 +28,18 @@ function saveInterests() {
   localStorage.setItem(`interests_${user.id}`, JSON.stringify(state.interests));
 }
 
+let hasSubmitted = false;
+
 export function renderDashboardMahasiswa() {
   const user = getUser();
   if (!user) {
     setRoute("login");
     return;
   }
+  
+  const submissionKeyPrefix = `submission_status_${user.id}_`;
+
+  hasSubmitted = localStorage.getItem("submission_status") === "pending";
 
   // Load interests from localStorage (synced with profile)
   const saved = localStorage.getItem(`interests_${user.id}`);
@@ -212,6 +218,23 @@ function renderUI() {
       </div>
     </div>
   `;
+
+  const applyBtn = document.getElementById("applyBtn") as HTMLButtonElement;
+
+  if (applyBtn) {
+    if (hasSubmitted) {
+      applyBtn.textContent = "Menunggu Konfirmasi";
+      applyBtn.disabled = true;
+      applyBtn.className =
+        "bg-yellow-400 text-black cursor-not-allowed px-4 py-2 rounded";
+    } else {
+      applyBtn.textContent = "Ajukan Dosen";
+      applyBtn.disabled = false;
+      applyBtn.className =
+        "bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded";
+    }
+  }
+
 
   setupEventListeners();
   // Setup header listeners after rendering
@@ -400,11 +423,84 @@ function renderLecturerCard(lecturer: Lecturer): string {
         }">
           Lihat Profil Lengkap Dosen
         </button>
-        <button class="btn btn-success btn-submit" data-submit-lecturer-id="${
-          lecturer.id || lecturer._id
-        }" data-lecturer-name="${lecturer.name}">
-          Ajukan Dosen
-        </button>
+        ${(() => {
+          // Determine if current user (mahasiswa) has already applied to this lecturer
+          try {
+            const userJson = localStorage.getItem("user");
+            const currentUser = userJson ? JSON.parse(userJson) : null;
+            const myId = currentUser?.id ?? currentUser?.user_id ?? currentUser?._id;
+
+            const applied = (() => {
+              // Check common fields that may indicate a student applied: isMahasiswa (array of ids), isApplied, applicants, requesters
+              const candidates: any[] = [];
+              if (lecturer.isMahasiswa) candidates.push(lecturer.isMahasiswa);
+              if ((lecturer as any).isApplied) candidates.push((lecturer as any).isApplied);
+              if ((lecturer as any).applicants) candidates.push((lecturer as any).applicants);
+              if ((lecturer as any).requesters) candidates.push((lecturer as any).requesters);
+
+              // Also check local optimistic storage for applied requests by this user
+              try {
+                const userJson = localStorage.getItem("user");
+                const currentUser = userJson ? JSON.parse(userJson) : null;
+                const myId = currentUser?.id ?? currentUser?.user_id ?? currentUser?._id;
+                if (myId) {
+                  const key = `applied_requests_${myId}`;
+                  const stored = localStorage.getItem(key);
+                  if (stored) {
+                    const arr = JSON.parse(stored || "[]");
+                    const lecId = lecturer.id ?? lecturer._id;
+                    if (lecId && Array.isArray(arr) && arr.some((v: any) => String(v) === String(lecId))) {
+                      return true;
+                    }
+                  }
+                }
+              } catch (e) {
+                // ignore
+              }
+
+              for (const c of candidates) {
+                if (!c) continue;
+                if (Array.isArray(c)) {
+                  if (c.some((v: any) => String(v) === String(myId))) return true;
+                } else if (typeof c === "string" || typeof c === "number") {
+                  if (String(c) === String(myId)) return true;
+                }
+              }
+
+              return false;
+            })();
+
+            if (applied) {
+              return `
+                <button class="btn btn-warning btn-applied" disabled data-applied="1">
+                  🔶 Sudah Mengajukan
+                </button>
+              `;
+            }
+          } catch (e) {
+            // ignore parsing errors and fallthrough to normal button
+          }
+          
+          const user = getUser();
+          const submissionKey = `submission_status_${user?.id}_${lecturer.id || lecturer._id}`;
+          const isPending = localStorage.getItem(submissionKey) === "pending";
+
+          if (isPending) {
+            return `
+              <button class="btn btn-warning" disabled>
+                ⏳ Menunggu Konfirmasi
+              </button>
+            `;
+          }
+
+          return `
+            <button class="btn btn-success btn-submit" data-submit-lecturer-id="${
+              lecturer.id || lecturer._id
+            }" data-lecturer-name="${lecturer.name}">
+              Ajukan Dosen
+            </button>
+          `;
+        })()}
       </div>
     </div>
   `;
@@ -512,6 +608,13 @@ function setupEventListeners() {
   // Lecturer card actions - Submit Request (Ajukan Dosen)
   document.querySelectorAll("[data-submit-lecturer-id]").forEach((btn) => {
     btn.addEventListener("click", () => {
+      // If button marked as applied, show info instead of opening submission
+      const isApplied = (btn as HTMLElement).dataset.applied;
+      if (isApplied === "1") {
+        showErrorModal("Pengajuan", "Anda telah mengajukan topik terkait. Silakan cek halaman profil untuk melihat status pengajuan atau hubungi admin.");
+        return;
+      }
+
       const id = (btn as HTMLElement).dataset.submitLecturerId;
       const name = (btn as HTMLElement).dataset.lecturerName;
       if (id && name) {
@@ -585,44 +688,43 @@ function closeSubmissionModal() {
 async function handleConfirmSubmission() {
   if (!currentSubmission) return;
 
-  const messageEl = document.getElementById(
-    "submissionMessage"
-  ) as HTMLTextAreaElement;
-  const message = messageEl?.value.trim() || "";
-
-  const confirmBtn = document.getElementById(
-    "confirmSubmission"
-  ) as HTMLButtonElement;
-  if (confirmBtn) {
-    confirmBtn.disabled = true;
-    confirmBtn.textContent = "Mengirim...";
-  }
+  const message =
+    (document.getElementById("submissionMessage") as HTMLTextAreaElement)
+      ?.value || "";
 
   try {
     await api.submitSupervisionRequest(currentSubmission.lecturerId, {
       topic: state.interests.join(", "),
-      message: message,
+      message,
     });
 
-    closeSubmissionModal();
-
-    // Show success modal
-    showSuccessModal(
-      "Pengajuan Berhasil!",
-      `Permintaan Anda untuk menjadikan ${currentSubmission.lecturerName} sebagai dosen pembimbing telah dikirim. Silakan tunggu konfirmasi dari dosen yang bersangkutan.`
-    );
-  } catch (error) {
-    let errorMessage = "Gagal mengirim pengajuan. Silakan coba lagi.";
-    if (error instanceof ApiError) {
-      errorMessage = error.message;
+    localStorage.setItem("submission_status", "pending");
+    const user = getUser();
+    if (user) {
+      const submissionKey = `submission_status_${user.id}_${currentSubmission.lecturerId}`;
+      localStorage.setItem(submissionKey, "pending");
     }
 
-    showErrorModal("Pengajuan Gagal", errorMessage);
-    console.error("Error submitting lecturer request:", error);
-  } finally {
-    if (confirmBtn) {
-      confirmBtn.disabled = false;
-      confirmBtn.textContent = "Ajukan Sekarang";
+    closeSubmissionModal();
+    
+    showSuccessModal(
+      "Pengajuan Berhasil",
+      "Pengajuan telah dikirim dan akan langsung muncul di dashboard dosen."
+    );
+
+  } catch (error) {
+    if (error instanceof ApiError) {
+      showErrorModal(
+        "Pengajuan Gagal",
+        error.message.includes("already")
+          ? "Anda sudah memiliki pengajuan aktif. Silakan tunggu keputusan dosen."
+          : error.message
+      );
+    } else {
+      showErrorModal(
+        "Pengajuan Gagal",
+        "Terjadi kesalahan pada sistem."
+      );
     }
   }
 }

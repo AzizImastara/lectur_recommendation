@@ -26,6 +26,12 @@ body {
   padding: 0;
 }
 
+.btn-waiting {
+  background-color: #facc15; /* kuning */
+  color: #000;
+  cursor: not-allowed;
+}
+
 #app {
   width: 100%;
   min-height: 100vh;

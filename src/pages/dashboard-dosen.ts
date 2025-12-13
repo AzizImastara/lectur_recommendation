@@ -59,13 +59,15 @@ async function loadSupervisionRequests() {
     // Normalize request data structure
     state.requests = state.requests.map((req: any) => ({
       id: req._id || req.id,
-      student_id: req.mahasiswaId || req.student_id,
+      student_id: req.mahasiswaId || req.student_id || req.mahasiswa_id,
       dosen_id: req.dosenId || req.dosen_id,
-      topic: req.topic,
+      topic: req.topic || req.topik || req.isTopic || "",
       message: req.note || req.message,
       status: req.status,
       created_at: req.createdAt || req.created_at,
-      student_name: req.student_name,
+      // Try multiple possible fields for student name that backend may return
+      student_name:
+        req.student_name || req.nama || req.name || req.mahasiswaName || req.mahasiswa_name || req.name_mahasiswa || req.full_name || req.username || null,
     }));
 
     // Filter only pending requests
@@ -78,15 +80,15 @@ async function loadSupervisionRequests() {
       if (request.student_id && !request.student_name) {
         try {
           const mahasiswa = await api.getMahasiswa(String(request.student_id));
-          if (mahasiswa && mahasiswa.name) {
-            request.student_name = mahasiswa.name;
+          if (mahasiswa) {
+            // Prefer several possible fields for student name
+            request.student_name =
+              mahasiswa.name || mahasiswa.nama || mahasiswa.full_name || mahasiswa.name_mahasiswa || mahasiswa.username || mahasiswa.email || String(request.student_id);
           }
         } catch (error) {
-          console.error(
-            `Failed to fetch mahasiswa ${request.student_id}:`,
-            error
-          );
-          // Continue with next request
+          console.error(`Failed to fetch mahasiswa ${request.student_id}:`, error);
+          // Fallback to id string so UI doesn't show generic 'Mahasiswa' nickname
+          request.student_name = String(request.student_id);
         }
       }
     }
@@ -95,7 +97,97 @@ async function loadSupervisionRequests() {
     state.error = "Gagal memuat data pengajuan mahasiswa";
   } finally {
     state.loading = false;
+    // Merge any local pending submissions targeted to this dosen (optimistic local entries)
+    try {
+      const pendingKey = `local_pending_submissions`;
+      const raw = localStorage.getItem(pendingKey);
+      if (raw) {
+        const localItems = JSON.parse(raw || "[]");
+        const myId = getUser()?.id;
+        // Append items where lecturerId matches current dosen (user)
+        const extras = localItems
+          .filter((it: any) => String(it.lecturerId) === String(myId))
+          .map((it: any) => ({
+            id: it.id,
+            student_id: it.studentId,
+            dosen_id: it.lecturerId,
+            topic: it.topic,
+            message: it.message,
+            status: it.status,
+            created_at: it.created_at,
+            student_name: it.studentName,
+            _local: true,
+          }));
+
+        if (extras.length > 0) {
+          // prepend so local pending appears at top
+          state.requests = [...extras, ...state.requests];
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to merge local pending submissions into dosen dashboard:", e);
+    }
   }
+}
+
+async function loadMyStudents() {
+  const students = await api.getMySupervisedStudents();
+
+  const container = document.getElementById("studentList");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  students.forEach((student) => {
+    container.innerHTML += `
+      <div class="p-3 border rounded mb-2">
+        <p class="font-semibold">${student.name}</p>
+        <p class="text-sm text-gray-600">${student.nim}</p>
+      </div>
+    `;
+  });
+}
+
+// Listen for BroadcastChannel events from student tabs and update requests live
+try {
+  const bc = new BroadcastChannel("lecturer_submissions");
+  bc.addEventListener("message", (ev) => {
+    try {
+      const data = ev.data;
+      if (!data) return;
+      if (data.type === "new_local_submission") {
+        const myId = getUser()?.id;
+        if (String(data.item.lecturerId) === String(myId)) {
+          state.requests = [
+            {
+              id: data.item.id,
+              student_id: data.item.studentId,
+              dosen_id: data.item.lecturerId,
+              topic: data.item.topic,
+              message: data.item.message,
+              status: data.item.status,
+              created_at: data.item.created_at,
+              student_name: data.item.studentName,
+              _local: true,
+            },
+            ...state.requests,
+          ];
+          renderUI();
+        }
+      } else if (data.type === "applied_flag") {
+        // mark existing requests UI if necessary
+        const myId = getUser()?.id;
+        if (String(data.lecturerId) === String(myId)) {
+          // no-op for now; reload can pick up local storage
+          renderUI();
+        }
+      }
+    } catch (e) {
+      console.warn("Error handling BroadcastChannel message:", e);
+    }
+  });
+} catch (e) {
+  // BroadcastChannel not available in some environments
 }
 
 function renderUI() {
@@ -172,6 +264,8 @@ function renderUI() {
       </div>
     </div>
   `;
+
+  loadMyStudents();
 
   setupEventListeners();
   setupHeaderListeners({
@@ -359,11 +453,15 @@ async function handleAcceptRequest(requestId: string) {
     const response = await api.acceptSupervisionRequest(requestId);
     console.log("Accept response:", response);
 
+    // 🔽 INI ADALAH LOKASI PERUBAHAN #5 (SUDAH BENAR)
+    await loadSupervisionRequests(); // refresh pengajuan
+    await loadMyStudents();          // masuk ke list bimbingan
+    renderUI();                      // render ulang UI
+
     showSuccessMessage(
       "Mahasiswa berhasil diterima sebagai mahasiswa bimbingan."
     );
-    await loadSupervisionRequests();
-    renderUI();
+
   } catch (error) {
     console.error("Error accepting request:", error);
     let errorMessage = "Gagal menerima mahasiswa. Silakan coba lagi.";
