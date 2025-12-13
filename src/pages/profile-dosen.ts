@@ -12,6 +12,7 @@ interface ProfileState {
   success: string | null;
   loading: boolean;
   editingPublication: string | number | null;
+  isEditingProfile: boolean;
 }
 
 const state: ProfileState = {
@@ -23,10 +24,8 @@ const state: ProfileState = {
   success: null,
   loading: false,
   editingPublication: null,
+  isEditingProfile: false,
 };
-
-// Store onLogout callback
-let logoutCallback: (() => void) | null = null;
 
 // Load expertise from localStorage
 function loadExpertise(): void {
@@ -61,9 +60,11 @@ async function loadPublications(): Promise<void> {
   renderUI();
 
   try {
-    // console.log("Loading publications...");
+    console.log("Loading publications...");
     const response = await api.getMyPublications();
-    // console.log("Loaded publications response:", response);
+    console.log("Loaded publications response:", response);
+    console.log("Response type:", typeof response);
+    console.log("Is Array?:", Array.isArray(response));
 
     // Handle different response formats
     let publications: any[] = [];
@@ -72,40 +73,51 @@ async function loadPublications(): Promise<void> {
     if (response && typeof response === "object") {
       if (Array.isArray(response)) {
         // Direct array response
+        console.log("✅ Using direct array response");
         publications = response;
       } else if (
         (response as any).data &&
         Array.isArray((response as any).data)
       ) {
         // Paginated response with data array
+        console.log("✅ Using response.data array");
         publications = (response as any).data;
       } else if (
         (response as any).publications &&
         Array.isArray((response as any).publications)
       ) {
         // Response with publications key
+        console.log("✅ Using response.publications array");
         publications = (response as any).publications;
       } else {
         // Try to use response as single publication or extract from object
-        publications = [response];
+        console.log("⚠️ Using response as single object or empty");
+        console.log("Response keys:", Object.keys(response));
+        publications =
+          response && Object.keys(response).length > 0 ? [response] : [];
       }
     }
 
-    // Transform publications to match expected format
-    publications = publications.map((pub: any) => ({
-      id: pub._id || pub.id,
-      title: pub.isTitle || pub.title,
-      topic: pub.isTopic || pub.topic,
-      year: pub.isYear || pub.year,
-      domain: pub.isDomain || pub.domain,
-      accreditation: pub.isAccreditation || pub.accreditation,
-      journal: pub.journal || pub.isDomain, // Use domain as journal if available
-      ...pub, // Keep all original fields
-    }));
+    console.log("Publications before transform:", publications);
+    console.log("Publications count:", publications.length);
 
-    // console.log("Transformed publications:", publications);
+    // Keep publications in API format (isTitle, isTopic, etc.)
+    publications = publications.map((pub: any) => {
+      console.log("Transforming publication:", pub);
+      return {
+        id: pub._id || pub.id,
+        isTitle: pub.isTitle || pub.title,
+        isTopic: pub.isTopic || pub.topic,
+        isYear: pub.isYear || pub.year,
+        isDomain: pub.isDomain || pub.domain,
+        isAccreditation: pub.isAccreditation || pub.accreditation,
+        ...pub, // Keep all original fields
+      };
+    });
+
+    console.log("Transformed publications:", publications);
     state.publications = publications;
-    // console.log("State publications after load:", state.publications);
+    console.log("State publications after load:", state.publications);
   } catch (error) {
     if (error instanceof ApiError) {
       state.error = error.message;
@@ -133,15 +145,12 @@ function loadSupervisedStudents(): void {
   ];
 }
 
-export function renderProfileDosen(onLogout: () => void) {
+export function renderProfileDosen() {
   const user = getUser();
   if (!user) {
     setRoute("login");
     return;
   }
-
-  // Store logout callback
-  logoutCallback = onLogout;
 
   // Load saved data
   loadExpertise();
@@ -165,18 +174,38 @@ function renderUI() {
     (user as any).program_studi ||
     "";
   const email = user.email || (user as any).email_address || "";
-  // Make sure name is not email - try name_dosen first for dosen
-  const userName =
-    (user as any).name_dosen ||
-    (user.name && user.name !== email ? user.name : "") ||
-    (user as any).full_name ||
-    "";
+  // Get name from user object, prioritizing actual name over email
+  const userName = user.name || "";
 
   app.innerHTML = `
     <!-- Header -->
     ${renderHeader("profile")}
 
     <div class="dashboard-container">
+      ${
+        state.error &&
+        !state.error.includes("publikasi") &&
+        !state.error.includes("keahlian")
+          ? `
+        <div class="alert alert-error">
+          ${state.error}
+          <button id="closeErrorProfile" class="close-btn">×</button>
+        </div>
+      `
+          : ""
+      }
+
+      ${
+        state.success && !state.success.includes("Publikasi")
+          ? `
+        <div class="alert alert-success">
+          ${state.success}
+          <button id="closeSuccessProfile" class="close-btn">×</button>
+        </div>
+      `
+          : ""
+      }
+
       <!-- Profile Information Section -->
       <section class="profile-section">
         <div class="profile-card">
@@ -191,8 +220,13 @@ function renderUI() {
                   type="text" 
                   id="profileName" 
                   class="profile-input" 
+                  ${
+                    state.isEditingProfile
+                      ? 'style="background-color: white; color: black;"'
+                      : ""
+                  }
                   value="${userName}" 
-                  disabled
+                  ${!state.isEditingProfile ? "disabled" : "required"}
                 />
               </div>
               
@@ -202,8 +236,13 @@ function renderUI() {
                   type="email" 
                   id="profileEmail" 
                   class="profile-input" 
+                  ${
+                    state.isEditingProfile
+                      ? 'style="background-color: white; color: black;"'
+                      : ""
+                  }
                   value="${email}" 
-                  disabled
+                  ${!state.isEditingProfile ? "disabled" : "required"}
                 />
               </div>
             </div>
@@ -215,8 +254,14 @@ function renderUI() {
                   type="text" 
                   id="profileNIDN" 
                   class="profile-input" 
+                  ${
+                    state.isEditingProfile
+                      ? 'style="background-color: white; color: black;"'
+                      : ""
+                  }
                   value="${nidn}" 
-                  disabled
+                  ${!state.isEditingProfile ? "disabled" : ""}
+                  minlength="10"
                 />
               </div>
               
@@ -226,10 +271,30 @@ function renderUI() {
                   type="text" 
                   id="profileMajor" 
                   class="profile-input" 
+                  ${
+                    state.isEditingProfile
+                      ? 'style="background-color: white; color: black;"'
+                      : ""
+                  }
                   value="${major}" 
-                  disabled
+                  ${!state.isEditingProfile ? "disabled" : ""}
                 />
               </div>
+            </div>
+
+            <div class="profile-actions">
+              ${
+                !state.isEditingProfile
+                  ? `<button class="btn btn-success" id="btnEditProfile">✏️ Edit Profil</button>`
+                  : `
+                <button type="button" class="btn btn-secondary" id="btnCancelEditProfile">Batal</button>
+                <button type="button" class="btn btn-success" id="btnSaveProfile" ${
+                  state.loading ? "disabled" : ""
+                }>
+                  ${state.loading ? "Menyimpan..." : "💾 Simpan Perubahan"}
+                </button>
+              `
+              }
             </div>
           </div>
         </div>
@@ -247,7 +312,7 @@ function renderUI() {
             state.error
               ? `
             <div class="alert alert-error">
-              <strong>Error:</strong> ${state.error}
+              ${state.error}
               <button id="closeError" class="close-btn">×</button>
             </div>
           `
@@ -301,7 +366,7 @@ function renderUI() {
             state.error && state.error.includes("publikasi")
               ? `
             <div class="alert alert-error">
-              <strong>Error:</strong> ${state.error}
+              ${state.error}
               <button id="closeErrorPub" class="close-btn">×</button>
             </div>
           `
@@ -311,7 +376,7 @@ function renderUI() {
             state.success && state.success.includes("Publikasi")
               ? `
             <div class="alert alert-success" style="background-color: #B8FFBA; color: black;">
-              <strong>Sukses:</strong> ${state.success}
+              ${state.success}
               <button id="closeSuccessPub" class="close-btn">×</button>
             </div>
           `
@@ -372,10 +437,10 @@ function renderUI() {
         </div>
         <form id="publicationForm" class="modal-form">
           <div class="form-group">
-            <label for="pubTitle">Judul Publikasi <span style="color: red;">*</span></label>
+            <label for="isTitle">Judul Publikasi <span style="color: red;">*</span></label>
             <input 
               type="text" 
-              id="pubTitle" 
+              id="isTitle" 
               class="form-input" 
               required
               placeholder="Masukkan judul publikasi"
@@ -383,10 +448,10 @@ function renderUI() {
             />
           </div>
           <div class="form-group">
-            <label for="pubTopic">Topik <span style="color: red;">*</span></label>
+            <label for="isTopic">Topik <span style="color: red;">*</span></label>
             <input 
               type="text" 
-              id="pubTopic" 
+              id="isTopic" 
               class="form-input" 
               required
               placeholder="Masukkan topik publikasi"
@@ -394,10 +459,10 @@ function renderUI() {
             />
           </div>
           <div class="form-group">
-            <label for="pubYear">Tahun <span style="color: red;">*</span></label>
+            <label for="isYear">Tahun <span style="color: red;">*</span></label>
             <input 
               type="number" 
-              id="pubYear" 
+              id="isYear" 
               class="form-input" 
               required
               placeholder="Tahun publikasi"
@@ -407,20 +472,20 @@ function renderUI() {
             />
           </div>
           <div class="form-group">
-            <label for="pubDomain">Domain</label>
+            <label for="isDomain">Domain</label>
             <input 
               type="text" 
-              id="pubDomain" 
+              id="isDomain" 
               class="form-input" 
               placeholder="Domain penelitian"
               style="background-color: white; color: black;"
             />
           </div>
           <div class="form-group">
-            <label for="pubAccreditation">Akreditasi</label>
+            <label for="isAccreditation">Akreditasi</label>
             <input 
               type="text" 
-              id="pubAccreditation" 
+              id="isAccreditation" 
               class="form-input" 
               placeholder="Tingkat akreditasi"
               style="background-color: white; color: black;"
@@ -435,29 +500,27 @@ function renderUI() {
     </div>
   `;
 
-  if (logoutCallback) {
-    setupEventListeners(logoutCallback);
-    setupHeaderListeners({
-      onLogout: logoutCallback,
-      onProfile: () => {
-        // Already on profile page
-      },
-      onDashboard: () => {
-        setRoute("dashboard");
-        window.dispatchEvent(new CustomEvent("routechange"));
-      },
-    });
-  }
+  setupEventListeners();
+  setupHeaderListeners({
+    onLogout: () => {},
+    onProfile: () => {
+      // Already on profile page
+    },
+    onDashboard: () => {
+      setRoute("dashboard");
+      window.dispatchEvent(new CustomEvent("routechange"));
+    },
+  });
 }
 
 function renderPublicationCard(pub: Publication | any): string {
-  // Support both old format (title, journal, year) and new format (isTitle, isTopic, isYear, etc.)
+  // Use API format (isTitle, isTopic, isYear, etc.) as priority
   const pubId = pub.id || pub._id || "unknown";
-  const title = pub.title || pub.isTitle || "N/A";
-  const topic = pub.topic || pub.isTopic || "";
-  const year = pub.year || pub.isYear || null;
-  const domain = pub.domain || pub.isDomain || "";
-  const accreditation = pub.accreditation || pub.isAccreditation || "";
+  const title = pub.isTitle || pub.title || "N/A";
+  const topic = pub.isTopic || pub.topic || "";
+  const year = pub.isYear || pub.year || null;
+  const domain = pub.isDomain || pub.domain || "";
+  const accreditation = pub.isAccreditation || pub.accreditation || "";
   const journal = pub.journal || "";
 
   // Create tags from topic, domain, and accreditation
@@ -538,7 +601,68 @@ function renderStudentCard(student: any): string {
   `;
 }
 
-function setupEventListeners(_onLogout: () => void) {
+function setupEventListeners() {
+  // Close error
+  document.getElementById("closeError")?.addEventListener("click", () => {
+    state.error = null;
+    renderUI();
+  });
+
+  // Close success
+  document.getElementById("closeSuccess")?.addEventListener("click", () => {
+    state.success = null;
+    renderUI();
+  });
+
+  // Close alerts for profile section
+  document
+    .getElementById("closeErrorProfile")
+    ?.addEventListener("click", () => {
+      state.error = null;
+      renderUI();
+    });
+
+  document
+    .getElementById("closeSuccessProfile")
+    ?.addEventListener("click", () => {
+      state.success = null;
+      renderUI();
+    });
+
+  // Close success in publications section
+  document.getElementById("closeSuccessPub")?.addEventListener("click", () => {
+    state.success = null;
+    renderUI();
+  });
+
+  // Close error in publications section
+  document.getElementById("closeErrorPub")?.addEventListener("click", () => {
+    state.error = null;
+    renderUI();
+  });
+
+  // Edit profile button
+  document.getElementById("btnEditProfile")?.addEventListener("click", () => {
+    state.isEditingProfile = true;
+    state.error = null;
+    state.success = null;
+    renderUI();
+  });
+
+  // Cancel edit profile button
+  document
+    .getElementById("btnCancelEditProfile")
+    ?.addEventListener("click", () => {
+      state.isEditingProfile = false;
+      state.error = null;
+      renderUI();
+    });
+
+  // Save profile button
+  document
+    .getElementById("btnSaveProfile")
+    ?.addEventListener("click", handleSaveProfile);
+
   // Add expertise
   const addBtn = document.getElementById("addExpertiseBtn");
   const expertiseInput = document.getElementById(
@@ -561,30 +685,6 @@ function setupEventListeners(_onLogout: () => void) {
       saveExpertise();
       renderUI();
     });
-  });
-
-  // Close error
-  document.getElementById("closeError")?.addEventListener("click", () => {
-    state.error = null;
-    renderUI();
-  });
-
-  // Close success
-  document.getElementById("closeSuccess")?.addEventListener("click", () => {
-    state.success = null;
-    renderUI();
-  });
-
-  // Close success in publications section
-  document.getElementById("closeSuccessPub")?.addEventListener("click", () => {
-    state.success = null;
-    renderUI();
-  });
-
-  // Close error in publications section
-  document.getElementById("closeErrorPub")?.addEventListener("click", () => {
-    state.error = null;
-    renderUI();
   });
 
   // Publication modals
@@ -662,6 +762,74 @@ function handleAddExpertise() {
   renderUI();
 }
 
+async function handleSaveProfile() {
+  const user = getUser();
+  if (!user) return;
+
+  // Get form values
+  const name = (document.getElementById("profileName") as HTMLInputElement)
+    ?.value;
+  const email = (document.getElementById("profileEmail") as HTMLInputElement)
+    ?.value;
+  const nidn = (document.getElementById("profileNIDN") as HTMLInputElement)
+    ?.value;
+  const major = (document.getElementById("profileMajor") as HTMLInputElement)
+    ?.value;
+
+  if (!name || !email) {
+    state.error = "Nama dan Email harus diisi";
+    renderUI();
+    return;
+  }
+
+  if (nidn && nidn.length < 10) {
+    state.error = "NIDN minimal 10 karakter";
+    renderUI();
+    return;
+  }
+
+  state.loading = true;
+  state.error = null;
+  state.success = null;
+  renderUI();
+
+  try {
+    // Update profile via API
+    const updateData = {
+      name,
+      email,
+      nidn,
+      major,
+    };
+
+    // Call API to update own profile
+    await api.updateMyProfileDosen(updateData);
+
+    // Update local user data after successful API call
+    const updatedUser = {
+      ...user,
+      name,
+      email,
+      nidn,
+      major,
+    };
+    localStorage.setItem("user", JSON.stringify(updatedUser));
+
+    state.success = "Profil berhasil diperbarui";
+    state.isEditingProfile = false;
+  } catch (error) {
+    console.error("Update profile error:", error);
+    if (error instanceof ApiError) {
+      state.error = error.message || "Gagal memperbarui profil";
+    } else {
+      state.error = "Gagal memperbarui profil. Silakan coba lagi.";
+    }
+  } finally {
+    state.loading = false;
+    renderUI();
+  }
+}
+
 function openPublicationModal(publicationId?: string | number) {
   const modal = document.getElementById("publicationModal");
   const modalTitle = document.getElementById("modalTitle");
@@ -672,15 +840,15 @@ function openPublicationModal(publicationId?: string | number) {
     if (pub) {
       state.editingPublication = publicationId;
       if (modalTitle) modalTitle.textContent = "Edit Publikasi";
-      (document.getElementById("pubTitle") as HTMLInputElement).value =
-        pub.title || (pub as any).isTitle || "";
-      (document.getElementById("pubTopic") as HTMLInputElement).value =
+      (document.getElementById("isTitle") as HTMLInputElement).value =
+        (pub as any).isTitle || pub.title || "";
+      (document.getElementById("isTopic") as HTMLInputElement).value =
         (pub as any).isTopic || (pub as any).topic || "";
-      (document.getElementById("pubYear") as HTMLInputElement).value =
-        pub.year?.toString() || (pub as any).isYear?.toString() || "";
-      (document.getElementById("pubDomain") as HTMLInputElement).value =
+      (document.getElementById("isYear") as HTMLInputElement).value =
+        (pub as any).isYear?.toString() || pub.year?.toString() || "";
+      (document.getElementById("isDomain") as HTMLInputElement).value =
         (pub as any).isDomain || (pub as any).domain || "";
-      (document.getElementById("pubAccreditation") as HTMLInputElement).value =
+      (document.getElementById("isAccreditation") as HTMLInputElement).value =
         (pub as any).isAccreditation || (pub as any).accreditation || "";
     }
   } else {
@@ -706,19 +874,19 @@ async function handlePublicationSubmit(e: Event) {
   e.preventDefault();
 
   const isTitle = (
-    document.getElementById("pubTitle") as HTMLInputElement
+    document.getElementById("isTitle") as HTMLInputElement
   ).value.trim();
   const isTopic = (
-    document.getElementById("pubTopic") as HTMLInputElement
+    document.getElementById("isTopic") as HTMLInputElement
   ).value.trim();
   const isYear = parseInt(
-    (document.getElementById("pubYear") as HTMLInputElement).value
+    (document.getElementById("isYear") as HTMLInputElement).value
   );
   const isDomain = (
-    document.getElementById("pubDomain") as HTMLInputElement
+    document.getElementById("isDomain") as HTMLInputElement
   ).value.trim();
   const isAccreditation = (
-    document.getElementById("pubAccreditation") as HTMLInputElement
+    document.getElementById("isAccreditation") as HTMLInputElement
   ).value.trim();
 
   if (!isTitle || !isTopic || !isYear) {
@@ -750,23 +918,17 @@ async function handlePublicationSubmit(e: Event) {
 
     console.log("Sending publication data:", publicationData);
 
-    let response;
     if (state.editingPublication) {
-      // Untuk update, mungkin perlu format yang berbeda atau endpoint yang berbeda
-      // Sementara menggunakan format yang sama
-      // Convert string ID to number if needed, or use as string
       const pubId =
         typeof state.editingPublication === "string"
           ? state.editingPublication
           : state.editingPublication;
-      response = await api.updatePublication(pubId as any, publicationData);
+      await api.updatePublication(pubId as any, publicationData);
       state.success = "Publikasi berhasil diperbarui!";
     } else {
-      response = await api.addPublication(publicationData);
+      await api.addPublication(publicationData);
       state.success = "Publikasi berhasil ditambahkan!";
     }
-
-    // console.log("Publication response:", response);
 
     closePublicationModal();
 

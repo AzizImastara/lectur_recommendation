@@ -1,8 +1,8 @@
-import { api, ApiError } from '../api';
-import type { Lecturer } from '../api';
-import { getUser, clearAuth } from '../auth';
-import { setRoute } from '../router';
-import { renderHeader, setupHeaderListeners } from '../components/header';
+import { api, ApiError } from "../api";
+import type { Lecturer } from "../api";
+import { getUser } from "../auth";
+import { setRoute } from "../router";
+import { renderHeader, setupHeaderListeners } from "../components/header";
 
 interface DashboardState {
   interests: string[];
@@ -17,21 +17,15 @@ const state: DashboardState = {
   recommendations: [],
   loading: false,
   error: null,
-  inputValue: '',
+  inputValue: "",
 };
 
-// Store onLogout callback
-let logoutCallback: (() => void) | null = null;
-
-export function renderDashboardMahasiswa(onLogout: () => void) {
+export function renderDashboardMahasiswa() {
   const user = getUser();
   if (!user) {
-    setRoute('login');
+    setRoute("login");
     return;
   }
-
-  // Store logout callback
-  logoutCallback = onLogout;
 
   // Load interests from localStorage (synced with profile)
   const saved = localStorage.getItem(`interests_${user.id}`);
@@ -55,11 +49,11 @@ function renderUI() {
   const user = getUser();
   if (!user) return;
 
-  const app = document.querySelector<HTMLDivElement>('#app')!;
+  const app = document.querySelector<HTMLDivElement>("#app")!;
 
   app.innerHTML = `
     <!-- Header -->
-    ${renderHeader('dashboard')}
+    ${renderHeader("dashboard")}
 
     <div class="dashboard-container">
       <!-- Welcome Section -->
@@ -80,12 +74,16 @@ function renderUI() {
           
           <div class="interests-input-container">
             <div class="interests-tags">
-              ${state.interests.map((interest, index) => `
+              ${state.interests
+                .map(
+                  (interest, index) => `
                 <span class="interest-tag">
                   ${interest}
                   <button class="tag-remove" data-index="${index}">×</button>
                 </span>
-              `).join('')}
+              `
+                )
+                .join("")}
             </div>
             <div class="interests-input-group">
               <input 
@@ -104,59 +102,74 @@ function renderUI() {
         </div>
       </section>
 
-      ${state.error ? `
+      ${
+        state.error
+          ? `
         <div class="alert alert-error">
-          <strong>Error:</strong> ${state.error}
+          ${state.error}
           <button id="closeError" class="close-btn">×</button>
         </div>
-      ` : ''}
+      `
+          : ""
+      }
 
       <!-- Recommendations Section -->
-      ${state.recommendations.length > 0 ? `
+      ${
+        state.recommendations.length > 0
+          ? `
         <section class="recommendations-section">
           <h2 class="section-title-large">
             ✨ Berikut rekomendasi Dosen Pembimbing untuk ${user.name}!
           </h2>
           <div class="recommendations-grid">
-            ${state.recommendations.map(lecturer => renderLecturerCard(lecturer)).join('')}
+            ${state.recommendations
+              .map((lecturer) => renderLecturerCard(lecturer))
+              .join("")}
           </div>
         </section>
-      ` : state.interests.length > 0 && !state.loading ? `
+      `
+          : state.interests.length > 0 && !state.loading
+          ? `
         <section class="recommendations-section">
           <p class="no-recommendations">Belum ada rekomendasi. Coba tambahkan minat penelitian Anda.</p>
         </section>
-      ` : ''}
+      `
+          : ""
+      }
 
-      ${state.loading ? `
+      ${
+        state.loading
+          ? `
         <div class="loading">
           <div class="spinner"></div>
           <p>Memuat rekomendasi...</p>
         </div>
-      ` : ''}
+      `
+          : ""
+      }
     </div>
   `;
 
-  if (logoutCallback) {
-    setupEventListeners(logoutCallback);
-    // Setup header listeners after rendering
-    setupHeaderListeners({ 
-      onLogout: () => handleLogout(logoutCallback),
-      onProfile: () => {
-        setRoute('profile');
-        window.dispatchEvent(new CustomEvent('routechange'));
-      },
-      onDashboard: () => {
-        // Already on dashboard
-      }
-    });
-  }
+  setupEventListeners();
+  // Setup header listeners after rendering
+  setupHeaderListeners({
+    onLogout: () => {},
+    onProfile: () => {
+      setRoute("profile");
+      window.dispatchEvent(new CustomEvent("routechange"));
+    },
+    onDashboard: () => {
+      // Already on dashboard
+    },
+  });
 }
 
 function renderLecturerCard(lecturer: Lecturer): string {
-  const bidangPenelitian = lecturer.bidang_penelitian || 
-                           (lecturer.expertise ? [lecturer.expertise] : []);
+  const bidangPenelitian =
+    lecturer.bidang_penelitian ||
+    (lecturer.expertise ? [lecturer.expertise] : []);
   const publikasi = lecturer.publikasi || [];
-  const phone = lecturer.phone || '';
+  const phone = lecturer.phone || "";
 
   return `
     <div class="lecturer-recommendation-card">
@@ -164,77 +177,115 @@ function renderLecturerCard(lecturer: Lecturer): string {
         <h3 class="lecturer-name">${lecturer.name}</h3>
       </div>
       <div class="lecturer-card-body">
-        ${lecturer.department ? `
+        ${
+          lecturer.department
+            ? `
           <p class="lecturer-info">
             <strong>Departemen:</strong> ${lecturer.department}
           </p>
-        ` : ''}
+        `
+            : ""
+        }
         
-        ${bidangPenelitian.length > 0 ? `
+        ${
+          bidangPenelitian.length > 0
+            ? `
           <div class="lecturer-section">
             <strong class="section-label">Bidang Penelitian:</strong>
             <div class="research-tags">
-              ${bidangPenelitian.map(field => `
+              ${bidangPenelitian
+                .map(
+                  (field) => `
                 <span class="research-tag">${field}</span>
-              `).join('')}
+              `
+                )
+                .join("")}
             </div>
           </div>
-        ` : ''}
+        `
+            : ""
+        }
 
-        ${publikasi.length > 0 ? `
+        ${
+          publikasi.length > 0
+            ? `
           <div class="lecturer-section">
             <strong class="section-label">Publikasi:</strong>
             <div class="publications-list">
-              ${publikasi.slice(0, 2).map(pub => `
+              ${publikasi
+                .slice(0, 2)
+                .map(
+                  (pub) => `
                 <div class="publication-item">
-                  <p class="publication-title">${pub.title || 'N/A'}</p>
+                  <p class="publication-title">${pub.title || "N/A"}</p>
                   <p class="publication-meta">
-                    ${pub.journal || ''} ${pub.year ? `• ${pub.year}` : ''}
+                    ${pub.journal || ""} ${pub.year ? `• ${pub.year}` : ""}
                   </p>
                 </div>
-              `).join('')}
-              ${publikasi.length > 2 ? `
-                <p class="publication-more">+${publikasi.length - 2} publikasi</p>
-              ` : ''}
+              `
+                )
+                .join("")}
+              ${
+                publikasi.length > 2
+                  ? `
+                <p class="publication-more">+${
+                  publikasi.length - 2
+                } publikasi</p>
+              `
+                  : ""
+              }
             </div>
           </div>
-        ` : ''}
+        `
+            : ""
+        }
       </div>
       <div class="lecturer-card-actions">
-        <button class="btn btn-primary btn-outline" data-lecturer-id="${lecturer.id}">
+        <button class="btn btn-primary btn-outline" data-lecturer-id="${
+          lecturer.id
+        }">
           Lihat Profil Lengkap Dosen
         </button>
-        ${phone ? `
-          <a href="https://wa.me/${phone.replace(/[^0-9]/g, '')}" target="_blank" class="btn btn-success btn-whatsapp">
+        ${
+          phone
+            ? `
+          <a href="https://wa.me/${phone.replace(
+            /[^0-9]/g,
+            ""
+          )}" target="_blank" class="btn btn-success btn-whatsapp">
             💬 Hubungi
           </a>
-        ` : `
+        `
+            : `
           <button class="btn btn-success btn-whatsapp" disabled>
             💬 Hubungi
           </button>
-        `}
+        `
+        }
       </div>
     </div>
   `;
 }
 
-function setupEventListeners(onLogout: () => void) {
+function setupEventListeners() {
   // Add interest
-  const addBtn = document.getElementById('addInterestBtn');
-  const interestInput = document.getElementById('interestInput') as HTMLInputElement;
+  const addBtn = document.getElementById("addInterestBtn");
+  const interestInput = document.getElementById(
+    "interestInput"
+  ) as HTMLInputElement;
 
-  addBtn?.addEventListener('click', handleAddInterest);
-  interestInput?.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
+  addBtn?.addEventListener("click", handleAddInterest);
+  interestInput?.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
       e.preventDefault();
       handleAddInterest();
     }
   });
 
   // Remove interest tags
-  document.querySelectorAll('.tag-remove').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const index = parseInt((e.target as HTMLElement).dataset.index || '0');
+  document.querySelectorAll(".tag-remove").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const index = parseInt((e.target as HTMLElement).dataset.index || "0");
       state.interests.splice(index, 1);
       if (state.interests.length > 0) {
         loadRecommendations();
@@ -246,14 +297,14 @@ function setupEventListeners(onLogout: () => void) {
   });
 
   // Close error
-  document.getElementById('closeError')?.addEventListener('click', () => {
+  document.getElementById("closeError")?.addEventListener("click", () => {
     state.error = null;
     renderUI();
   });
 
   // Lecturer card actions
-  document.querySelectorAll('[data-lecturer-id]').forEach(btn => {
-    btn.addEventListener('click', () => {
+  document.querySelectorAll("[data-lecturer-id]").forEach((btn) => {
+    btn.addEventListener("click", () => {
       const id = (btn as HTMLElement).dataset.lecturerId;
       // TODO: Show lecturer profile modal
       alert(`Lihat profil dosen ID: ${id}`);
@@ -262,21 +313,23 @@ function setupEventListeners(onLogout: () => void) {
 }
 
 function handleAddInterest() {
-  const interestInput = document.getElementById('interestInput') as HTMLInputElement;
+  const interestInput = document.getElementById(
+    "interestInput"
+  ) as HTMLInputElement;
   const value = interestInput?.value.trim();
 
   if (!value) return;
 
   if (state.interests.includes(value)) {
-    state.error = 'Minat penelitian ini sudah ditambahkan';
+    state.error = "Minat penelitian ini sudah ditambahkan";
     renderUI();
     return;
   }
 
   state.interests.push(value);
-  state.inputValue = '';
-  interestInput.value = '';
-  
+  state.inputValue = "";
+  interestInput.value = "";
+
   loadRecommendations();
   renderUI();
 }
@@ -301,18 +354,11 @@ async function loadRecommendations() {
     if (error instanceof ApiError) {
       state.error = error.message;
     } else {
-      state.error = 'Gagal memuat rekomendasi';
+      state.error = "Gagal memuat rekomendasi";
     }
-    console.error('Error loading recommendations:', error);
+    console.error("Error loading recommendations:", error);
   } finally {
     state.loading = false;
     renderUI();
   }
 }
-
-function handleLogout(onLogout: () => void) {
-  clearAuth();
-  setRoute('login');
-  onLogout();
-}
-

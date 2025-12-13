@@ -139,41 +139,53 @@ export function renderLogin(onLoginSuccess: () => void) {
         throw new Error("Token tidak ditemukan dalam response");
       }
 
-      // Save token first so we can call getCurrentUser
-      localStorage.setItem('auth_token', accessToken);
-
-      // Try to get full user data from API
-      let fullUserData: any = { ...userData };
-      
-      // First, try to preserve existing user data from localStorage if available
-      // This helps maintain data between logins
-      const existingUserStr = localStorage.getItem('user');
-      if (existingUserStr) {
+      // Decode JWT token to get user data
+      function decodeJWT(token: string): any {
         try {
-          const existingUser = JSON.parse(existingUserStr);
-          // Merge existing data with new login data, preserving important fields that might not be in login response
-          if (existingUser.nidn && !fullUserData.nidn && !fullUserData.NIDN) fullUserData.nidn = existingUser.nidn;
-          if (existingUser.nim && !fullUserData.nim && !fullUserData.NIM) fullUserData.nim = existingUser.nim;
-          if (existingUser.major && !fullUserData.major && !fullUserData.Major && !fullUserData.program_studi) fullUserData.major = existingUser.major;
-          if (existingUser.noHp && !fullUserData.noHp && !fullUserData.noHP && !fullUserData.phone) fullUserData.noHp = existingUser.noHp;
-          if (existingUser.name_dosen && !fullUserData.name_dosen) fullUserData.name_dosen = existingUser.name_dosen;
-          if (existingUser.name_mahasiswa && !fullUserData.name_mahasiswa) fullUserData.name_mahasiswa = existingUser.name_mahasiswa;
+          const base64Url = token.split(".")[1];
+          const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+          const jsonPayload = decodeURIComponent(
+            atob(base64)
+              .split("")
+              .map(function (c) {
+                return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+              })
+              .join("")
+          );
+          return JSON.parse(jsonPayload);
         } catch (e) {
-          // Ignore parse errors
+          console.error("Failed to decode JWT:", e);
+          return {};
         }
       }
-      
+
+      const decodedToken = decodeJWT(accessToken);
+      console.log("Decoded JWT token:", decodedToken);
+
+      // Save token first so we can call getCurrentUser
+      localStorage.setItem("auth_token", accessToken);
+
+      // Try to get full user data from API
+      // Start with decoded JWT token data which contains complete user info
+      let fullUserData: any = {
+        ...userData,
+        ...decodedToken, // Merge decoded token data (has name, nidn, major, etc.)
+      };
+
       // Then try to get fresh data from API
       try {
         const currentUser = await api.getCurrentUser();
         console.log("Current user data from API:", currentUser);
         // Merge: API data takes priority, but keep existing data if API doesn't have it
-        fullUserData = { 
+        fullUserData = {
           ...fullUserData, // Keep existing merged data
-          ...currentUser,  // Override with fresh API data
+          ...currentUser, // Override with fresh API data
         };
       } catch (err) {
-        console.warn("Could not fetch current user data, using login response and existing data:", err);
+        console.warn(
+          "Could not fetch current user data, using login response and existing data:",
+          err
+        );
         // Use merged userData (from login + existing localStorage) if getCurrentUser fails
       }
 
@@ -181,25 +193,38 @@ export function renderLogin(onLoginSuccess: () => void) {
       // Preserve all fields from API response, especially nidn, nim, major, noHp, etc.
       const user = {
         ...fullUserData, // Include semua field lain dari response dulu
-        id: fullUserData.id || fullUserData.user_id || fullUserData._id || username,
+        id:
+          fullUserData.userId ||
+          fullUserData.id ||
+          fullUserData.user_id ||
+          fullUserData._id ||
+          username,
         name:
-          fullUserData.name || 
+          fullUserData.name ||
           fullUserData.name_dosen || // For dosen
           fullUserData.name_mahasiswa || // For mahasiswa
-          fullUserData.full_name || 
-          fullUserData.username || 
-          fullUserData.email || // Fallback to email if name not available
+          fullUserData.full_name ||
+          fullUserData.username ||
           username,
         email: fullUserData.email || fullUserData.email_address || username,
         role: role, // Override dengan role dari form
         // Preserve additional fields - prioritize API response, then existing data
         nidn: fullUserData.nidn || fullUserData.NIDN || "",
         nim: fullUserData.nim || fullUserData.NIM || "",
-        major: fullUserData.major || fullUserData.Major || fullUserData.program_studi || "",
-        noHp: fullUserData.noHp || fullUserData.noHP || fullUserData.phone || fullUserData.phone_number || "",
-        // Preserve name_dosen and name_mahasiswa if available
-        name_dosen: fullUserData.name_dosen || "",
-        name_mahasiswa: fullUserData.name_mahasiswa || "",
+        major:
+          fullUserData.major ||
+          fullUserData.Major ||
+          fullUserData.program_studi ||
+          "",
+        noHp:
+          fullUserData.noHp ||
+          fullUserData.noHP ||
+          fullUserData.phone ||
+          fullUserData.phone_number ||
+          "",
+        isTopic: fullUserData.isTopic || [],
+        isPublish: fullUserData.isPublish || [],
+        isMahasiswa: fullUserData.isMahasiswa || [],
       };
 
       // Save auth data with complete user information

@@ -11,23 +11,45 @@ import type { LoginResponse, User } from "./auth";
 // Types untuk API responses
 export interface Lecturer {
   id?: number;
+  _id?: string;
   name: string;
   expertise?: string;
   email?: string;
   department?: string;
-  bidang_penelitian?: string[];
-  publikasi?: Publication[];
+  major?: string;
+  nidn?: string;
+  noHp?: string;
   phone?: string;
+  bidang_penelitian?: string[];
+  isTopic?: string[];
+  publikasi?: Publication[];
+  [key: string]: any;
+}
+
+export interface Mahasiswa {
+  id?: string;
+  name: string;
+  email?: string;
+  nim?: string;
+  major?: string;
+  noHp?: string;
   [key: string]: any;
 }
 
 export interface Publication {
-  id?: number;
-  title: string;
-  journal?: string;
+  id?: number | string;
+  _id?: string;
+  isTitle?: string;
+  isTopic?: string;
+  isYear?: number;
+  isDomain?: string;
+  isAccreditation?: string;
+  // Legacy support
+  title?: string;
+  topic?: string;
   year?: number;
-  author?: string;
-  doi?: string;
+  domain?: string;
+  accreditation?: string;
   [key: string]: any;
 }
 
@@ -371,6 +393,28 @@ export const api = {
     return apiRequest<User>("/auth/me", {}, true);
   },
 
+  async updateMyProfileMahasiswa(data: Partial<Mahasiswa>): Promise<Mahasiswa> {
+    return apiRequest<Mahasiswa>(
+      "/user/mahasiswa/me",
+      {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      },
+      true
+    );
+  },
+
+  async updateMyProfileDosen(data: Partial<Lecturer>): Promise<Lecturer> {
+    return apiRequest<Lecturer>(
+      "/user/dosen/me",
+      {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      },
+      true
+    );
+  },
+
   // Get all lecturers
   async getLecturers(): Promise<Lecturer[]> {
     return apiRequest<Lecturer[]>("/lecturers", {}, true);
@@ -491,6 +535,99 @@ export const api = {
       `/topic/request/${requestId}/reject`,
       {
         method: "POST",
+      },
+      true
+    );
+  },
+
+  // Super Admin endpoints
+  async getAllMahasiswa(): Promise<Mahasiswa[]> {
+    return apiRequest<Mahasiswa[]>("/user/mahasiswa", {}, true);
+  },
+
+  async getAllDosen(): Promise<Lecturer[]> {
+    return apiRequest<Lecturer[]>("/user/dosen", {}, true);
+  },
+
+  async getMahasiswaById(userId: string): Promise<Mahasiswa> {
+    return apiRequest<Mahasiswa>(`/user/mahasiswa/${userId}`, {}, true);
+  },
+
+  async getDosenById(userId: string): Promise<Lecturer> {
+    return apiRequest<Lecturer>(`/user/dosen/${userId}`, {}, true);
+  },
+
+  async updateMahasiswa(
+    userId: string,
+    data: Partial<Mahasiswa>
+  ): Promise<Mahasiswa> {
+    return apiRequest<Mahasiswa>(
+      `/user/mahasiswa/${userId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      },
+      true
+    );
+  },
+
+  async updateDosen(
+    userId: string,
+    data: Partial<Lecturer>
+  ): Promise<Lecturer> {
+    return apiRequest<Lecturer>(
+      `/user/dosen/${userId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      },
+      true
+    );
+  },
+
+  async deleteMahasiswa(userId: string): Promise<void> {
+    return apiRequest<void>(
+      `/user/mahasiswa/${userId}`,
+      {
+        method: "DELETE",
+      },
+      true
+    );
+  },
+
+  async deleteDosen(userId: string): Promise<void> {
+    return apiRequest<void>(
+      `/user/dosen/${userId}`,
+      {
+        method: "DELETE",
+      },
+      true
+    );
+  },
+
+  async updateMahasiswaActive(
+    userId: string,
+    isActive: boolean
+  ): Promise<Mahasiswa> {
+    return apiRequest<Mahasiswa>(
+      `/user/mahasiswa/${userId}/active`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ active: isActive }),
+      },
+      true
+    );
+  },
+
+  async updateDosenActive(
+    userId: string,
+    isActive: boolean
+  ): Promise<Lecturer> {
+    return apiRequest<Lecturer>(
+      `/user/dosen/${userId}/active`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ active: isActive }),
       },
       true
     );

@@ -8,6 +8,7 @@ import { renderDashboardDosen } from "./pages/dashboard-dosen";
 import { renderDashboardAdmin } from "./pages/dashboard-admin";
 import { renderProfileMahasiswa } from "./pages/profile-mahasiswa";
 import { renderProfileDosen } from "./pages/profile-dosen";
+import { renderProfileAdmin } from "./pages/profile-admin";
 
 // Initialize route
 initRoute();
@@ -40,19 +41,15 @@ function render() {
   // Handle profile route
   if (route === "profile") {
     if (role === "mahasiswa") {
-      renderProfileMahasiswa(() => {
-        // On logout
-        setRoute("login");
-        render();
-      });
+      renderProfileMahasiswa();
       return;
     }
     if (role === "dosen") {
-      renderProfileDosen(() => {
-        // On logout
-        setRoute("login");
-        render();
-      });
+      renderProfileDosen();
+      return;
+    }
+    if (role === "super_admin") {
+      renderProfileAdmin();
       return;
     }
     // For other roles, fall through to dashboard
@@ -64,25 +61,13 @@ function render() {
   // Render dashboard based on user role
   switch (role) {
     case "mahasiswa":
-      renderDashboardMahasiswa(() => {
-        // On logout
-        setRoute("login");
-        render();
-      });
+      renderDashboardMahasiswa();
       break;
     case "dosen":
-      renderDashboardDosen(() => {
-        // On logout
-        setRoute("login");
-        render();
-      });
+      renderDashboardDosen();
       break;
     case "super_admin":
-      renderDashboardAdmin(() => {
-        // On logout
-        setRoute("login");
-        render();
-      });
+      renderDashboardAdmin();
       break;
     default:
       // Unknown role, show login

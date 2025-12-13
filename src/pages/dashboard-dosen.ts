@@ -1,19 +1,19 @@
-import { getUser } from '../auth';
-import { setRoute } from '../router';
-import { renderHeader, setupHeaderListeners } from '../components/header';
+import { getUser } from "../auth";
+import { setRoute } from "../router";
+import { renderHeader, setupHeaderListeners } from "../components/header";
 
-export function renderDashboardDosen(onLogout: () => void) {
+export function renderDashboardDosen() {
   const user = getUser();
   if (!user) {
-    setRoute('login');
+    setRoute("login");
     return;
   }
 
-  const app = document.querySelector<HTMLDivElement>('#app')!;
+  const app = document.querySelector<HTMLDivElement>("#app")!;
 
   app.innerHTML = `
     <!-- Header -->
-    ${renderHeader('dashboard')}
+    ${renderHeader("dashboard")}
 
     <div class="dashboard-container">
       <section class="welcome-section">
@@ -43,15 +43,14 @@ export function renderDashboardDosen(onLogout: () => void) {
     </div>
   `;
 
-  setupHeaderListeners({ 
-    onLogout,
+  setupHeaderListeners({
+    onLogout: () => {},
     onProfile: () => {
       setRoute("profile");
       window.dispatchEvent(new CustomEvent("routechange"));
     },
     onDashboard: () => {
       // Already on dashboard
-    }
+    },
   });
 }
-
