@@ -14,7 +14,7 @@ import { renderProfileAdmin } from "./pages/profile-admin";
 initRoute();
 
 // Main render function
-function render() {
+async function render() {
   const route = getCurrentRoute();
   const authenticated = isAuthenticated();
 
@@ -45,7 +45,7 @@ function render() {
       return;
     }
     if (role === "dosen") {
-      renderProfileDosen();
+      await renderProfileDosen(); // Await async function
       return;
     }
     if (role === "super_admin") {

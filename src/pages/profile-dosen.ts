@@ -53,6 +53,57 @@ function saveExpertise(): void {
   }
 }
 
+// Sync expertise to backend API using isTopic field
+async function syncExpertiseToBackend(): Promise<void> {
+  try {
+    const expertiseString = state.expertise.join(","); // Format: "svm,ml,ai"
+    await api.updateMyProfileDosen({
+      isTopic: expertiseString as any, // Backend expects string, not array
+    });
+    console.log("✓ Expertise synced to backend (isTopic):", expertiseString);
+  } catch (error) {
+    console.warn("Failed to sync expertise to backend:", error);
+    // Don't show error to user, just log it
+  }
+}
+
+// Sync publication topics to dosen isTopic field
+async function syncPublicationTopicsToDosenTopic(): Promise<void> {
+  try {
+    // Ambil semua topik dari publikasi
+    const publicationTopics = state.publications
+      .map((pub) => {
+        const topic = (pub as any).isTopic || pub.topic || "";
+        return topic.toLowerCase().trim();
+      })
+      .filter((topic) => topic); // Remove empty strings
+
+    // Gabungkan dengan expertise yang sudah ada (dari manual input)
+    const allTopics = [...state.expertise.map((e) => e.toLowerCase())];
+
+    // Tambahkan topik publikasi yang belum ada
+    publicationTopics.forEach((pubTopic) => {
+      if (!allTopics.includes(pubTopic)) {
+        allTopics.push(pubTopic);
+      }
+    });
+
+    // Update ke backend
+    const topicsString = allTopics.join(",");
+    await api.updateMyProfileDosen({
+      isTopic: topicsString as any,
+    });
+
+    console.log("✓ Publication topics synced to dosen isTopic:", topicsString);
+
+    // Update state.expertise agar UI update
+    state.expertise = allTopics;
+    saveExpertise();
+  } catch (error) {
+    console.warn("Failed to sync publication topics:", error);
+  }
+}
+
 // Load publications from API
 async function loadPublications(): Promise<void> {
   state.loading = true;
@@ -60,50 +111,29 @@ async function loadPublications(): Promise<void> {
   renderUI();
 
   try {
-    console.log("Loading publications...");
     const response = await api.getMyPublications();
-    console.log("Loaded publications response:", response);
-    console.log("Response type:", typeof response);
-    console.log("Is Array?:", Array.isArray(response));
-
-    // Handle different response formats
     let publications: any[] = [];
 
-    // Check if response has pagination structure (data array)
     if (response && typeof response === "object") {
       if (Array.isArray(response)) {
-        // Direct array response
-        console.log("✅ Using direct array response");
         publications = response;
       } else if (
         (response as any).data &&
         Array.isArray((response as any).data)
       ) {
-        // Paginated response with data array
-        console.log("✅ Using response.data array");
         publications = (response as any).data;
       } else if (
         (response as any).publications &&
         Array.isArray((response as any).publications)
       ) {
-        // Response with publications key
-        console.log("✅ Using response.publications array");
         publications = (response as any).publications;
       } else {
-        // Try to use response as single publication or extract from object
-        console.log("⚠️ Using response as single object or empty");
-        console.log("Response keys:", Object.keys(response));
         publications =
           response && Object.keys(response).length > 0 ? [response] : [];
       }
     }
 
-    console.log("Publications before transform:", publications);
-    console.log("Publications count:", publications.length);
-
-    // Keep publications in API format (isTitle, isTopic, etc.)
     publications = publications.map((pub: any) => {
-      console.log("Transforming publication:", pub);
       return {
         id: pub._id || pub.id,
         isTitle: pub.isTitle || pub.title,
@@ -115,9 +145,7 @@ async function loadPublications(): Promise<void> {
       };
     });
 
-    console.log("Transformed publications:", publications);
     state.publications = publications;
-    console.log("State publications after load:", state.publications);
   } catch (error) {
     if (error instanceof ApiError) {
       state.error = error.message;
@@ -131,10 +159,7 @@ async function loadPublications(): Promise<void> {
   }
 }
 
-// Load supervised students (mock data for now, can be replaced with API call)
 function loadSupervisedStudents(): void {
-  // TODO: Replace with actual API call when available
-  // For now, using mock data
   state.supervisedStudents = [
     {
       id: 1,
@@ -145,19 +170,57 @@ function loadSupervisedStudents(): void {
   ];
 }
 
-export function renderProfileDosen() {
+export async function renderProfileDosen() {
   const user = getUser();
   if (!user) {
     setRoute("login");
     return;
   }
 
-  // Load saved data
+  // Load saved data from localStorage first (fast)
   loadExpertise();
+
+  // Load data from API
+  await loadProfileFromBackend();
   loadPublications();
   loadSupervisedStudents();
 
   renderUI();
+}
+
+// Load profile data including expertise from backend
+async function loadProfileFromBackend(): Promise<void> {
+  try {
+    const profile = await api.getMyProfileDosen();
+    console.log("Loaded profile from backend:", profile);
+    console.log("All profile keys:", Object.keys(profile));
+
+    // Backend menggunakan isTopic untuk menyimpan expertise
+    const expertiseField = profile.isTopic || null;
+
+    console.log("Expertise field (isTopic):", expertiseField);
+
+    // Update expertise dari backend jika tersedia
+    if (expertiseField) {
+      if (Array.isArray(expertiseField)) {
+        state.expertise = expertiseField;
+        console.log("✓ Loaded expertise as array:", state.expertise);
+      } else if (typeof expertiseField === "string") {
+        // Jika string, split by comma
+        state.expertise = (expertiseField as string)
+          .split(",")
+          .map((s: string) => s.trim())
+          .filter((s: string) => s);
+        console.log("✓ Loaded expertise from string:", state.expertise);
+      }
+      saveExpertise(); // Save to localStorage
+    } else {
+      console.log("⚠ No expertise field found in backend response");
+    }
+  } catch (error) {
+    console.warn("Failed to load profile from backend:", error);
+    // Fallback to localStorage data (already loaded)
+  }
 }
 
 function renderUI() {
@@ -305,7 +368,7 @@ function renderUI() {
         <div class="interests-card">
           <h2 class="section-title-large">Sesuaikan Bidang Keahlian!</h2>
           <p class="section-subtitle">
-            Bidang keahlian Anda membantu mahasiswa menemukan Anda
+            Bidang keahlian Anda membantu mahasiswa menemukan Anda. <strong>Klik "Simpan Profil" di atas untuk menyimpan ke sistem.</strong>
           </p>
           
           ${
@@ -679,10 +742,11 @@ function setupEventListeners() {
 
   // Remove expertise tags
   document.querySelectorAll(".tag-remove").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
+    btn.addEventListener("click", async (e) => {
       const index = parseInt((e.target as HTMLElement).dataset.index || "0");
       state.expertise.splice(index, 1);
       saveExpertise();
+      await syncExpertiseToBackend(); // Sync ke backend immediately
       renderUI();
     });
   });
@@ -733,7 +797,7 @@ function setupEventListeners() {
   });
 }
 
-function handleAddExpertise() {
+async function handleAddExpertise() {
   const expertiseInput = document.getElementById(
     "expertiseInput"
   ) as HTMLInputElement;
@@ -759,6 +823,7 @@ function handleAddExpertise() {
   }
 
   saveExpertise();
+  await syncExpertiseToBackend(); // Sync ke backend immediately
   renderUI();
 }
 
@@ -794,16 +859,28 @@ async function handleSaveProfile() {
   renderUI();
 
   try {
-    // Update profile via API
-    const updateData = {
+    // Update profile via API (termasuk expertise)
+    const updateData: any = {
       name,
       email,
       nidn,
       major,
     };
 
+    // Backend menggunakan isTopic untuk expertise (format: comma-separated string)
+    if (state.expertise.length > 0) {
+      updateData.isTopic = state.expertise.join(","); // Format: "ai,ml,nlp"
+      console.log(
+        "Sending expertise to backend (isTopic):",
+        updateData.isTopic
+      );
+    }
+
+    console.log("Update data being sent:", updateData);
+
     // Call API to update own profile
-    await api.updateMyProfileDosen(updateData);
+    const response = await api.updateMyProfileDosen(updateData);
+    console.log("Profile update response:", response);
 
     // Update local user data after successful API call
     const updatedUser = {
@@ -815,8 +892,15 @@ async function handleSaveProfile() {
     };
     localStorage.setItem("user", JSON.stringify(updatedUser));
 
-    state.success = "Profil berhasil diperbarui";
+    const expertiseInfo =
+      state.expertise.length > 0
+        ? ` (${state.expertise.length} bidang keahlian tersimpan)`
+        : "";
+    state.success = `Profil berhasil diperbarui${expertiseInfo}`;
     state.isEditingProfile = false;
+
+    // Reload profile untuk verify data tersimpan
+    await loadProfileFromBackend();
   } catch (error) {
     console.error("Update profile error:", error);
     if (error instanceof ApiError) {
@@ -916,7 +1000,7 @@ async function handlePublicationSubmit(e: Event) {
       publicationData.isAccreditation = isAccreditation;
     }
 
-    console.log("Sending publication data:", publicationData);
+    // console.log("Sending publication data:", publicationData);
 
     if (state.editingPublication) {
       const pubId =
@@ -929,6 +1013,9 @@ async function handlePublicationSubmit(e: Event) {
       await api.addPublication(publicationData);
       state.success = "Publikasi berhasil ditambahkan!";
     }
+
+    // Auto-sync: Tambahkan topik publikasi ke isTopic dosen
+    await syncPublicationTopicsToDosenTopic();
 
     closePublicationModal();
 
@@ -963,6 +1050,9 @@ async function handleDeletePublication(id: string | number) {
     // API might expect number, but we'll pass as any to handle both string and number
     await api.deletePublication(id as any);
     await loadPublications();
+
+    // Auto-sync: Update isTopic dosen setelah publikasi dihapus
+    await syncPublicationTopicsToDosenTopic();
   } catch (error) {
     if (error instanceof ApiError) {
       state.error = error.message;

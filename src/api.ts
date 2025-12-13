@@ -63,6 +63,17 @@ export interface TopicRequest {
   [key: string]: any;
 }
 
+export interface SupervisionRequest {
+  id?: number;
+  dosen_id?: number;
+  student_id?: string;
+  topic?: string;
+  status?: string;
+  message?: string;
+  created_at?: string;
+  [key: string]: any;
+}
+
 export interface RecommendationRequest {
   student_id?: string;
   student_name?: string;
@@ -148,13 +159,25 @@ async function apiRequest<T>(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new ApiError(
-        errorData.detail ||
-          errorData.message ||
-          `HTTP error! status: ${response.status}`,
-        response.status,
-        errorData
-      );
+      console.error(`API Error (${response.status}):`, errorData);
+
+      // Extract error message from various formats
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      if (errorData.detail) {
+        if (typeof errorData.detail === "string") {
+          errorMessage = errorData.detail;
+        } else if (Array.isArray(errorData.detail)) {
+          errorMessage = errorData.detail
+            .map((d: any) => d.msg || JSON.stringify(d))
+            .join(", ");
+        } else {
+          errorMessage = JSON.stringify(errorData.detail);
+        }
+      } else if (errorData.message) {
+        errorMessage = errorData.message;
+      }
+
+      throw new ApiError(errorMessage, response.status, errorData);
     }
 
     // Handle empty responses
@@ -404,6 +427,10 @@ export const api = {
     );
   },
 
+  async getMyProfileDosen(): Promise<Lecturer> {
+    return apiRequest<Lecturer>("/user/dosen/me", {}, true);
+  },
+
   async updateMyProfileDosen(data: Partial<Lecturer>): Promise<Lecturer> {
     return apiRequest<Lecturer>(
       "/user/dosen/me",
@@ -430,7 +457,7 @@ export const api = {
     data: RecommendationRequest
   ): Promise<RecommendationResponse> {
     return apiRequest<RecommendationResponse>(
-      "/recommendations",
+      "/recommendation",
       {
         method: "POST",
         body: JSON.stringify(data),
@@ -631,5 +658,108 @@ export const api = {
       },
       true
     );
+  },
+
+  // Supervision Request - Submit request for lecturer to be supervisor
+  async submitSupervisionRequest(
+    dosenId: string | number,
+    data: { topic: string; message?: string }
+  ): Promise<SupervisionRequest> {
+    return apiRequest<SupervisionRequest>(
+      `/topic/${dosenId}/request`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      },
+      true
+    );
+  },
+
+  // Get supervision requests for logged-in dosen (or mahasiswa)
+  async getSupervisionRequests(): Promise<SupervisionRequest[]> {
+    return apiRequest<SupervisionRequest[]>(
+      `/topic/request/me`,
+      {
+        method: "GET",
+      },
+      true
+    );
+  },
+
+  // Get mahasiswa's own supervision requests
+  async getMySupervisionRequests(): Promise<SupervisionRequest[]> {
+    return apiRequest<SupervisionRequest[]>(
+      `/topic/request/me`,
+      {
+        method: "GET",
+      },
+      true
+    );
+  },
+
+  // Delete/Cancel supervision request
+  async deleteSupervisionRequest(requestId: string | number): Promise<any> {
+    return apiRequest<any>(
+      `/topic/request/${requestId}`,
+      {
+        method: "DELETE",
+      },
+      true
+    );
+  },
+
+  // Get mahasiswa by ID
+  async getMahasiswa(mahasiswaId: string): Promise<Mahasiswa> {
+    return apiRequest<Mahasiswa>(
+      `/mahasiswa/${mahasiswaId}`,
+      {
+        method: "GET",
+      },
+      true
+    );
+  },
+
+  // Accept supervision request (for dosen)
+  async acceptSupervisionRequest(requestId: string | number): Promise<any> {
+    console.log(
+      `Accepting request ${requestId} via POST /topic/request/${requestId}/accept`
+    );
+    try {
+      const result = await apiRequest<any>(
+        `/topic/request/${requestId}/accept`,
+        {
+          method: "POST",
+          body: JSON.stringify({}),
+        },
+        true
+      );
+      console.log("Accept request successful:", result);
+      return result;
+    } catch (error) {
+      console.error("Accept request failed:", error);
+      throw error;
+    }
+  },
+
+  // Reject supervision request (for dosen)
+  async rejectSupervisionRequest(requestId: string | number): Promise<any> {
+    console.log(
+      `Rejecting request ${requestId} via POST /topic/request/${requestId}/reject`
+    );
+    try {
+      const result = await apiRequest<any>(
+        `/topic/request/${requestId}/reject`,
+        {
+          method: "POST",
+          body: JSON.stringify({}),
+        },
+        true
+      );
+      console.log("Reject request successful:", result);
+      return result;
+    } catch (error) {
+      console.error("Reject request failed:", error);
+      throw error;
+    }
   },
 };
